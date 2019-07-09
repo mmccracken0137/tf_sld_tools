@@ -4,8 +4,6 @@ from sklearn.model_selection import train_test_split
 from sklearn import preprocessing, metrics
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
-# import matplotlib
-# matplotlib.use("tkagg")
 from sld_pipeline import *
 import tensorflow as tf  ## this code runs with tf2.0-cpu!!!
 from tensorflow.keras.models import Sequential
@@ -16,8 +14,6 @@ import sys
 
 # to use latex with matplotlib
 from matplotlib import rc
-#rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-## for Palatino and other serif fonts use:
 rc('font',**{'family':'serif','serif':['Palatino']})
 rc('text', usetex=True)
 
@@ -25,18 +21,19 @@ rc('text', usetex=True)
 #tf.logging.set_verbosity(tf.logging.ERROR)
 
 # hyper-parameters and data parameters
-write_model_files = True
+write_model_files = False # True
 bkgd_type = 'ppim' # 'fastpi' # 'ppim'
 data_tag = '' #_small'
 kf_type = 'p4vect'
 kf_tag = ''
 if kf_type == 'p4only':
     kf_tag = '_p4only'
+drop_non_p4x4 = True #False
 
-hidden_layer_nodes = [200, 200, 20]
+hidden_layer_nodes = [200, 100]
 n_hidden_layers = len(hidden_layer_nodes)
-dropout_frac = 0.35
-n_epochs = 200
+dropout_frac = 0.30
+n_epochs = 50
 
 data_dir = sys.argv[1]
 
@@ -73,6 +70,22 @@ df = pd.concat(df)
 # df = df[df.beam_E < 5.0]
 
 sld_add_features(df)
+
+to_drop_nonp4x4 = ['run','rftime',
+                   'kp_beta_time','kp_chisq_time','kp_ndf_time','kp_ndf_trk','kp_chisq_trk',
+                   'kp_ndf_dedx','kp_chisq_dedx', 'kp_dedx_cdc','kp_dedx_fdc','kp_dedx_tof',
+                   'kp_dedx_st','kp_ebcal','kp_eprebcal','kp_efcal','kp_bcal_delphi',
+                   'kp_bcal_delz','kp_fcal_doca',
+                   'p_beta_time','p_chisq_time','p_ndf_time','p_ndf_trk','p_chisq_trk',
+                   'p_ndf_dedx','p_chisq_dedx','kp_dedx_cdc','p_dedx_fdc','p_dedx_tof',
+                   'p_dedx_st','p_ebcal','p_eprebcal','p_efcal','p_bcal_delphi',
+                   'p_bcal_delz','p_fcal_doca',
+                   'mum_beta_time','mum_chisq_time','mum_ndf_time','mum_ndf_trk','mum_chisq_trk',
+                   'mum_ndf_dedx','mum_chisq_dedx','mum_dedx_cdc','mum_dedx_fdc','mum_dedx_tof',
+                   'mum_dedx_st','mum_ebcal','mum_eprebcal','mum_efcal','mum_bcal_delphi',
+                   'mum_bcal_delz','mum_fcal_doca']
+if drop_non_p4x4:
+    df.drop(to_drop_nonp4x4, axis=1, inplace=True)
 
 df.dropna(inplace=True)
 
@@ -121,6 +134,23 @@ def binary_model(n_inputs, n_hidden, hidden_nodes, input_dropout=0.0, biases=Tru
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
+def dec_score_comp(mod, x_train, x_test):
+    # generate decision score histograms to calculate overtraining parameter...
+    decis_train = keras_model.predict(x_train).ravel()
+    decis_test = keras_model.predict(x_test).ravel()
+    # make histograms with 100 bins, get bin contents
+    counts_train, bin_edges_train = np.histogram(decis_train, 100, range=(0,1))
+    counts_test, bin_edges_test = np.histogram(decis_test, 100, range=(0,1))
+    # rescale the train scores to the test scores by integral...
+    counts_train = np.sum(counts_test)/np.sum(counts_train) * counts_train
+
+    diff_sum = 0
+    for i in range(len(counts_train)):
+        diff_sum += (counts_train[i] - counts_test[i])**2
+    diff_sum = diff_sum**0.5 / np.sum(counts_train)
+    return diff_sum
+
+
 keras_model = binary_model(len(X_train.columns), n_hidden=n_hidden_layers,
                            hidden_nodes=hidden_layer_nodes,
                            input_dropout=dropout_frac)
@@ -131,6 +161,7 @@ print('training nn classifier...\n')
 epochs, train_accs, test_accs = [], [], []
 eval_accs, eval_loss = [], []
 train_loss, test_loss = [], []
+sig_ot_comp, bkgd_ot_comp = [], []
 
 for i in range(n_epochs):
     print("\nEPOCH " + str(i) + "/" + str(n_epochs))
@@ -149,14 +180,17 @@ for i in range(n_epochs):
     test_loss.append(loss)
     print("testing --> loss = %0.4f, \t acc = %0.4f"%(loss, acc))
 
+    sig_ot_comp.append(dec_score_comp(keras_model, X_train_scale[y_train>0.5], X_test_scale[y_test>0.5]))
+    bkgd_ot_comp.append(dec_score_comp(keras_model, X_train_scale[y_train<0.5], X_test_scale[y_test<0.5]))
+
 print("")
 y_pred_keras = keras_model.predict(X_test_scale).ravel()
 fpr_keras, tpr_keras, thresholds_keras = metrics.roc_curve(y_test, y_pred_keras)
 auc_keras = metrics.auc(fpr_keras, tpr_keras)
 print("auc score on test: %0.4f" % auc_keras)
 
-fig = plt.figure(figsize=(11,6))
-plt.subplot(2,2,1)
+fig = plt.figure(figsize=(11,7))
+plt.subplot(3,2,1)
 plt.plot(epochs, eval_accs, label='train, dropout=' + str(dropout_frac))
 plt.plot(epochs, train_accs, label='train')
 plt.plot(epochs, test_accs, label='test')
@@ -170,7 +204,7 @@ plt.xlabel('epoch')
 
 #print(history.history.keys())
 #plt.plot(history.history['acc'])
-plt.subplot(2,2,2)
+plt.subplot(3,2,2)
 plt.plot(epochs, eval_loss, label='train, dropout=' + str(dropout_frac))
 plt.plot(epochs, train_loss, label='train')
 plt.plot(epochs, test_loss, label='test')
@@ -187,7 +221,8 @@ bkgd_decis_train = keras_model.predict(X_train_scale[y_train<=0.5]).ravel()
 sig_decis = keras_model.predict(X_test_scale[y_test>0.5]).ravel()
 bkgd_decis = keras_model.predict(X_test_scale[y_test<=0.5]).ravel()
 
-plt.subplot(2,2,3)
+# decsion scores
+plt.subplot(3,2,3)
 #sig_decis_train *= np.amax(sig_decis) / np.amax(sig_decis_train)
 sig_counts_train, sig_bin_edges_train = np.histogram(sig_decis_train, 100, range=(0,1))
 sig_counts, sig_bin_edges = np.histogram(sig_decis, 100, range=(0,1))
@@ -197,8 +232,10 @@ bkgd_counts, bkgd_bin_edges = np.histogram(bkgd_decis, 100, range=(0,1))
 sig_bin_cents = (sig_bin_edges[:-1] + sig_bin_edges[1:])/2.
 bkgd_bin_cents = (bkgd_bin_edges[:-1] + bkgd_bin_edges[1:])/2.
 
-sig_counts_train = np.amax(sig_counts)/np.amax(sig_counts_train) * sig_counts_train
-bkgd_counts_train = np.amax(bkgd_counts)/np.amax(bkgd_counts_train) * bkgd_counts_train
+#sig_counts_train = np.amax(sig_counts)/np.amax(sig_counts_train) * sig_counts_train
+#bkgd_counts_train = np.amax(bkgd_counts)/np.amax(bkgd_counts_train) * bkgd_counts_train
+sig_counts_train = np.sum(sig_counts)/np.sum(sig_counts_train) * sig_counts_train
+bkgd_counts_train = np.sum(bkgd_counts)/np.sum(bkgd_counts_train) * bkgd_counts_train
 
 plt.hist(sig_decis, color='r', alpha=0.5, range=(0,1), bins=100,
          label=r'$\Lambda \rightarrow p \mu^{-} \overline{\nu}$, test')
@@ -215,8 +252,9 @@ plt.xlabel(r'NN output')
 plt.tight_layout
 #plt.show()
 
+# ROC plot
 roc_auc = metrics.auc(fpr_keras, tpr_keras)
-plt.subplot(2,2,4)
+plt.subplot(3,2,4)
 plt.plot(fpr_keras, tpr_keras, lw=1, label='ROC (area = %0.3f)'%(roc_auc))
 plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6)) #, label='luck')
 plt.xlim([-0.05, 1.05])
@@ -226,6 +264,13 @@ plt.ylabel('true positive rate')
 plt.title('receiver operating characteristic')
 plt.legend(loc="lower right")
 plt.grid()
+
+# decision score comparison, overtraining
+plt.subplot(3,2,5)
+plt.plot(epochs, sig_ot_comp, label='signal')
+plt.plot(epochs, bkgd_ot_comp, label='bkgd')
+plt.xlabel('epochs')
+plt.ylabel('decision profile diff.')
 
 plt.tight_layout()
 plt.show()
