@@ -26,7 +26,7 @@ rc('text', usetex=True)
 # hyper-parameters and data parameters
 write_model_files = False # True
 bkgd_type = 'all' #ppim' # 'fastpi' # 'ppim'
-data_tag = ''#_small'
+data_tag = '_small'
 kf_type = 'p4vect'
 kf_tag = ''
 if kf_type == 'p4only':
@@ -36,7 +36,7 @@ drop_non_p4x4 = True #False
 hidden_layer_nodes = [200, 100]
 n_hidden_layers = len(hidden_layer_nodes)
 dropout_frac = 0.25
-n_epochs = 50
+n_epochs = 10
 
 data_dir = sys.argv[1]
 
@@ -65,13 +65,13 @@ df_pimgam['type_label'] = 4
 class_labels = []
 if bkgd_type == 'ppim':
     df = [df_sld, df_ppim]
-    class_labels = ['sldmu', 'ppim']
+    class_labels = ['sld\_mu', 'p\_pim']
 elif bkgd_type == 'fastpi':
     df = [df_sld, df_fastpi]
-    class_labels = ['sldmu', 'fastpi']
+    class_labels = ['sld\_mu', 'fastpi']
 elif bkgd_type == 'all':
     df = [df_sld, df_ppim, df_fastpi, df_pimgam]
-    class_labels = ['sldmu', 'ppim', 'fastpi', 'pimgam']
+    class_labels = ['sld\_mu', 'p\_pim', 'fastpi', 'pim\_gam']
 else:
     print('error: incorrect background type')
     sys.exit()
@@ -210,12 +210,8 @@ y_pred = y_1hot_pred.argmax(axis=1)
 
 matrix_train = metrics.confusion_matrix(y_1hot_train.argmax(axis=1), y_1hot_pred_train.argmax(axis=1))
 matrix_train = matrix_train.astype('float') / matrix_train.sum(axis=1)[:, np.newaxis]
-print('\n\ntrain confusion matrix:')
-print(matrix_train)
 matrix_test = metrics.confusion_matrix(y_1hot_test.argmax(axis=1), y_1hot_pred.argmax(axis=1))
 matrix_test = matrix_test.astype('float') / matrix_test.sum(axis=1)[:, np.newaxis]
-print('\n\ntest confusion matrix:')
-print(matrix_test)
 
 #dirp
 
@@ -232,7 +228,7 @@ plt.title('model accuracy')
 plt.legend(loc="lower right")
 plt.ylabel('accuracy')
 plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
+plt.legend(loc='upper left')
 
 plt.subplot(2,2,2)
 plt.plot(epochs, eval_loss, label='train, dropout=' + str(dropout_frac))
@@ -245,10 +241,12 @@ plt.xlabel('epoch')
 #plt.legend(['train', 'test'], loc='upper left')
 
 ax = plt.subplot(2,2,3)
+print('training results...')
 plot_confusion_matrix(y_1hot_train.argmax(axis=1), y_1hot_pred_train.argmax(axis=1), class_labels, ax,
                           normalize=True,
                           title='confusion matrix, train')
 
+print('\ntesting results...')
 ax = plt.subplot(2,2,4)
 plot_confusion_matrix(y_1hot_test.argmax(axis=1), y_1hot_pred.argmax(axis=1), class_labels, ax,
                           normalize=True,
