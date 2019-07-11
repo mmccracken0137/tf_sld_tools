@@ -1,0 +1,18 @@
+{
+  "DATA": {
+    "DATA_TAG": "_small",
+    "BKGD_TYPE": "all",
+    "KF_TYPE": "p4vect",
+    "DROP_NON_P4X4": 1,
+    "DATA_DIR": "../jun2019/features_files/"
+  },
+  "MODEL": {
+    "TEST_TMP_DIR": "tests",
+    "DROPOUT_FRAC": 0.0,
+    "HIDDEN_LAYER_NODES": [200, 100]
+  },
+  "RUN": {
+    "WRITE_MODEL_FILES": 0,
+    "N_EPOCHS": 50
+  }
+}

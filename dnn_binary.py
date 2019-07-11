@@ -10,6 +10,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
+import json
 import sys
 
 # to use latex with matplotlib
@@ -21,46 +22,51 @@ rc('text', usetex=True)
 #tf.logging.set_verbosity(tf.logging.ERROR)
 
 # hyper-parameters and data parameters
-write_model_files = False # True
-bkgd_type = 'ppim' #ppim' # 'fastpi' # 'ppim'
-data_tag = '_small'
-kf_type = 'p4vect'
+# read in from json config file supplied on command line
+with open(sys.argv[1], 'r') as f:
+    config = json.load(f)
+
+write_model_files = config['RUN']['WRITE_MODEL_FILES']
+bkgd_type = config['DATA']['BKGD_TYPE']
+data_tag = config['DATA']['DATA_TAG']
+kf_type = config['DATA']['KF_TYPE']
 kf_tag = ''
 if kf_type == 'p4only':
     kf_tag = '_p4only'
-drop_non_p4x4 = True #False
+drop_non_p4x4 = config['DATA']['DROP_NON_P4X4']
 
-hidden_layer_nodes = [200, 100]
+hidden_layer_nodes = config['MODEL']['HIDDEN_LAYER_NODES']
 n_hidden_layers = len(hidden_layer_nodes)
-dropout_frac = 0.30
-n_epochs = 50
+dropout_frac = config['MODEL']['DROPOUT_FRAC']
+n_epochs = config['RUN']['N_EPOCHS']
 
-data_dir = sys.argv[1]
+data_dir = config['DATA']['DATA_DIR']
 
 # read in feats files
 print('\nreading data files...\n')
 kf_tag = '' #_p4only'
-# df_sld = pd.read_csv("feats_files/feats_sl_mu" + kf_tag + "_1___" + data_tag + ".csv")#, dtype='float64')
-# df_ppim = pd.read_csv("feats_files/feats_ppim" + kf_tag + "_1___" + data_tag + ".csv")
-# df_fastpi = pd.read_csv("feats_files/feats_ppim_fastpi" + kf_tag + "_1___" + data_tag + ".csv")
 df_sld = pd.read_csv(data_dir + "/flat_slmu" + data_tag + ".csv")#, dtype='float64')
 df_ppim = pd.read_csv(data_dir + "/flat_ppim" + data_tag + ".csv")
 df_fastpi = pd.read_csv(data_dir + "/flat_fastpi" + data_tag + ".csv")
+df_pimgam = pd.read_csv(data_dir + "/flat_pimgam" + data_tag + ".csv")
 
 # add types/labels
 df_sld['sig_label'] = 1
-df_sld['type_label'] = 1
 df_ppim['sig_label'] = 0
-df_ppim['type_label'] = 0
 df_fastpi['sig_label'] = 0
-df_fastpi['type_label'] = -1
+df_pimgam['sig_label'] = 0
+
+df_sld['type_label'] = 1
+df_ppim['type_label'] = 2
+df_fastpi['type_label'] = 3
+df_pimgam['type_label'] = 4
 
 if bkgd_type == 'ppim':
     df = [df_sld, df_ppim]
 elif bkgd_type == 'fastpi':
     df = [df_sld, df_fastpi]
 elif bkgd_type == 'all':
-    df = [df_sld, df_fastpi, df_ppim]
+    df = [df_sld, df_fastpi, df_ppim, df_pimgam]
 else:
     print('error: incorrect background type')
     sys.exit()
