@@ -22,8 +22,8 @@ rc('text', usetex=True)
 
 # hyper-parameters and data parameters
 write_model_files = False # True
-bkgd_type = 'ppim' # 'fastpi' # 'ppim'
-data_tag = '' #_small'
+bkgd_type = 'ppim' #ppim' # 'fastpi' # 'ppim'
+data_tag = '_small'
 kf_type = 'p4vect'
 kf_tag = ''
 if kf_type == 'p4only':
