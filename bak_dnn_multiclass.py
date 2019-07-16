@@ -44,11 +44,41 @@ dropout_frac = config['MODEL']['DROPOUT_FRAC']
 n_epochs = config['RUN']['N_EPOCHS']
 
 data_dir = config['DATA']['DATA_DIR']
-data_types = config['DATA']['DATA_TYPES']
 # read in feats files
 print('\nreading data files...\n')
+kf_tag = '' #_p4only'
+df_sld = pd.read_csv(data_dir + "/flat_slmu" + data_tag + ".csv")#, dtype='float64')
+df_ppim = pd.read_csv(data_dir + "/flat_ppim" + data_tag + ".csv")
+df_fastpi = pd.read_csv(data_dir + "/flat_fastpi" + data_tag + ".csv")
+df_pimgam = pd.read_csv(data_dir + "/flat_pimgam" + data_tag + ".csv")
+df_sldel = pd.read_csv(data_dir + "/flat_sle" + data_tag + ".csv")#, dtype='float64')
 
-df, class_labels = get_dfs(data_types, data_dir, data_tag="")
+# add types/labels
+df_sld['sig_label'] = 1
+df_ppim['sig_label'] = 0
+df_fastpi['sig_label'] = 0
+df_pimgam['sig_label'] = 0
+df_sldel['sig_label'] = 0
+
+df_sld['type_label'] = 1
+df_ppim['type_label'] = 2
+df_fastpi['type_label'] = 3
+df_pimgam['type_label'] = 4
+df_sldel['type_label'] = 5
+
+class_labels = []
+if bkgd_type == 'ppim':
+    df = [df_sld, df_ppim]
+    class_labels = ['sld\_mu', 'p\_pim']
+elif bkgd_type == 'fastpi':
+    df = [df_sld, df_fastpi]
+    class_labels = ['sld\_mu', 'fastpi']
+elif bkgd_type == 'all':
+    df = [df_sld, df_ppim, df_fastpi, df_pimgam, df_sldel]
+    class_labels = ['sld\_mu', 'p\_pim', 'fastpi', 'pim\_gam', 'sld\_e']
+else:
+    print('error: incorrect background type')
+    sys.exit()
 df = pd.concat(df)
 
 ### DROP higher beam energies
@@ -108,7 +138,40 @@ X_test_scale = scaler.transform(X_test)
 ### dnn classifier
 print('initializing nn classifier...\n')
 
-keras_model = multiclass_model(len(X_train.columns), len(y_1hot_train[0]),
+def binary_model(n_inputs, n_classes, n_hidden, hidden_nodes, input_dropout=0.0, biases=True):
+    model = Sequential()
+    if input_dropout > 0.0:
+        model.add(Dropout(input_dropout, input_shape=(n_inputs, )))
+        model.add(Dense(hidden_nodes[0], activation='relu', use_bias=biases))
+    else:
+        model.add(Dense(hidden_nodes[0], input_dim=n_inputs,
+                        activation='relu', use_bias=biases))
+
+    for i in range(n_hidden - 1):
+        model.add(Dense(hidden_nodes[i+1], activation='relu', use_bias=biases))
+
+    model.add(Dense(n_classes, activation='softmax'))
+    # Compile model
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
+
+def dec_score_comp(mod, x_train, x_test):
+    # generate decision score histograms to calculate overtraining parameter...
+    decis_train = keras_model.predict(x_train).ravel()
+    decis_test = keras_model.predict(x_test).ravel()
+    # make histograms with 100 bins, get bin contents
+    counts_train, bin_edges_train = np.histogram(decis_train, 100, range=(0,1))
+    counts_test, bin_edges_test = np.histogram(decis_test, 100, range=(0,1))
+    # rescale the train scores to the test scores by integral...
+    counts_train = np.sum(counts_test)/np.sum(counts_train) * counts_train
+
+    diff_sum = 0
+    for i in range(len(counts_train)):
+        diff_sum += (counts_train[i] - counts_test[i])**2
+    diff_sum = diff_sum**0.5 / np.sum(counts_train)
+    return diff_sum
+
+keras_model = binary_model(len(X_train.columns), len(y_1hot_train[0]),
                            n_hidden=n_hidden_layers, hidden_nodes=hidden_layer_nodes,
                            input_dropout=dropout_frac)
 print(keras_model.summary())
@@ -193,27 +256,83 @@ plot_confusion_matrix(y_1hot_test.argmax(axis=1), y_1hot_pred.argmax(axis=1), cl
                           normalize=True,
                           title='confusion matrix, test')
 
+# sig_decis_train = keras_model.predict(X_train_scale[y_train>0.5]).ravel()
+# bkgd_decis_train = keras_model.predict(X_train_scale[y_train<=0.5]).ravel()
+# sig_decis = keras_model.predict(X_test_scale[y_test>0.5]).ravel()
+# bkgd_decis = keras_model.predict(X_test_scale[y_test<=0.5]).ravel()
+#
+# # decsion scores
+# plt.subplot(3,2,3)
+# #sig_decis_train *= np.amax(sig_decis) / np.amax(sig_decis_train)
+# sig_counts_train, sig_bin_edges_train = np.histogram(sig_decis_train, 100, range=(0,1))
+# sig_counts, sig_bin_edges = np.histogram(sig_decis, 100, range=(0,1))
+# bkgd_counts_train, bkgd_bin_edges_train = np.histogram(bkgd_decis_train, 100, range=(0,1))
+# bkgd_counts, bkgd_bin_edges = np.histogram(bkgd_decis, 100, range=(0,1))
+#
+# sig_bin_cents = (sig_bin_edges[:-1] + sig_bin_edges[1:])/2.
+# bkgd_bin_cents = (bkgd_bin_edges[:-1] + bkgd_bin_edges[1:])/2.
+#
+# #sig_counts_train = np.amax(sig_counts)/np.amax(sig_counts_train) * sig_counts_train
+# #bkgd_counts_train = np.amax(bkgd_counts)/np.amax(bkgd_counts_train) * bkgd_counts_train
+# sig_counts_train = np.sum(sig_counts)/np.sum(sig_counts_train) * sig_counts_train
+# bkgd_counts_train = np.sum(bkgd_counts)/np.sum(bkgd_counts_train) * bkgd_counts_train
+#
+# plt.hist(sig_decis, color='r', alpha=0.5, range=(0,1), bins=100,
+#          label=r'$\Lambda \rightarrow p \mu^{-} \overline{\nu}$, test')
+#          #log=True)
+# plt.hist(bkgd_decis, color='b', alpha=0.5, range=(0,1), bins=100,
+#          label=r'background (' + bkgd_type + '), test')
+# plt.plot(sig_bin_cents, sig_counts_train, 'r.',
+#          label=r'$\Lambda \rightarrow p \mu^{-} \overline{\nu}$, train (scaled)', markersize=3)
+# plt.plot(bkgd_bin_cents, bkgd_counts_train, 'b.',
+#          label=r'background (' + bkgd_type + '), train (scaled)', markersize=3)
+# plt.title('decision function')
+# plt.legend(loc="upper center")
+# plt.xlabel(r'NN output')
+# plt.tight_layout
+# #plt.show()
+#
+# # ROC plot
+# roc_auc = metrics.auc(fpr_keras, tpr_keras)
+# plt.subplot(3,2,4)
+# plt.plot(fpr_keras, tpr_keras, lw=1, label='ROC (area = %0.3f)'%(roc_auc))
+# plt.plot([0, 1], [0, 1], '--', color=(0.6, 0.6, 0.6)) #, label='luck')
+# plt.xlim([-0.05, 1.05])
+# plt.ylim([-0.05, 1.05])
+# plt.xlabel('false positive rate')
+# plt.ylabel('true positive rate')
+# plt.title('receiver operating characteristic')
+# plt.legend(loc="lower right")
+# plt.grid()
+#
+# # decision score comparison, overtraining
+# plt.subplot(3,2,5)
+# plt.plot(epochs, sig_ot_comp, label='signal')
+# plt.plot(epochs, bkgd_ot_comp, label='bkgd')
+# plt.xlabel('epochs')
+# plt.ylabel('decision profile diff.')
+
 plt.tight_layout()
 plt.show()
 
 # # save the model and weights
-if write_model_files:
-    data_str = ':'.join(data_types)
-    file_str = './multiclass_models/' + 'types:' + data_str + '_kf:' + kf_type + '_'
-    file_str += 'neps:' + str(n_epochs) + '_layers:'
-    for i in range(len(hidden_layer_nodes)):
-        file_str += str(hidden_layer_nodes[i])
-        if i != len(hidden_layer_nodes) - 1:
-            file_str += '.'
-    file_str += '_do:' + ("%0.2f" % dropout_frac)
-
-    print(file_str)
-
-    model_json = keras_model.to_json()
-    with open(file_str + ".json", "w") as json_file:
-        json_file.write(model_json)
-
-    keras_model.save_weights(file_str + ".h5")
-    print("Saved model to disk")
-
-    fig.savefig(file_str + '.png')
+# if write_model_files:
+#     file_str = './models/' + 'bkgd:' + bkgd_type + '_kf:' + kf_type + '_'
+#     file_str += 'neps:' + str(n_epochs) + '_layers:'
+#     for i in range(len(hidden_layer_nodes)):
+#         file_str += str(hidden_layer_nodes[i])
+#         if i != len(hidden_layer_nodes) - 1:
+#             file_str += '.'
+#     file_str += '_do:' + ("%0.2f" % dropout_frac)
+#     file_str += '_auc:' + '%0.3f' % roc_auc
+#
+#     print(file_str)
+#
+#     model_json = keras_model.to_json()
+#     with open(file_str + ".json", "w") as json_file:
+#         json_file.write(model_json)
+#
+#     keras_model.save_weights(file_str + ".h5")
+#     print("Saved model to disk")
+#
+#     fig.savefig(file_str + '.png')

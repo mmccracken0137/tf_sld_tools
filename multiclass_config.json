@@ -2,6 +2,7 @@
   "DATA": {
     "DATA_TAG": "_small",
     "BKGD_TYPE": "all",
+    "DATA_TYPES": ["sld_mu", "ppim", "fastpi", "pim_gam", "sld_e"],
     "KF_TYPE": "p4vect",
     "DROP_NON_P4X4": 1,
     "DATA_DIR": "../jun2019/features_files/"
@@ -13,6 +14,6 @@
   },
   "RUN": {
     "WRITE_MODEL_FILES": 0,
-    "N_EPOCHS": 50
+    "N_EPOCHS": 3
   }
 }

@@ -4,7 +4,10 @@ from sklearn.model_selection import train_test_split
 from sklearn import preprocessing, metrics
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+
 from sld_pipeline import *
+from dnn_tools import *
+
 import tensorflow as tf  ## this code runs with tf2.0-cpu!!!
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
@@ -41,40 +44,17 @@ dropout_frac = config['MODEL']['DROPOUT_FRAC']
 n_epochs = config['RUN']['N_EPOCHS']
 
 data_dir = config['DATA']['DATA_DIR']
+data_types = config['DATA']['DATA_TYPES']
 
 # read in feats files
 print('\nreading data files...\n')
-kf_tag = '' #_p4only'
-df_sld = pd.read_csv(data_dir + "/flat_slmu" + data_tag + ".csv")#, dtype='float64')
-df_ppim = pd.read_csv(data_dir + "/flat_ppim" + data_tag + ".csv")
-df_fastpi = pd.read_csv(data_dir + "/flat_fastpi" + data_tag + ".csv")
-df_pimgam = pd.read_csv(data_dir + "/flat_pimgam" + data_tag + ".csv")
-
-# add types/labels
-df_sld['sig_label'] = 1
-df_ppim['sig_label'] = 0
-df_fastpi['sig_label'] = 0
-df_pimgam['sig_label'] = 0
-
-df_sld['type_label'] = 1
-df_ppim['type_label'] = 2
-df_fastpi['type_label'] = 3
-df_pimgam['type_label'] = 4
-
-if bkgd_type == 'ppim':
-    df = [df_sld, df_ppim]
-elif bkgd_type == 'fastpi':
-    df = [df_sld, df_fastpi]
-elif bkgd_type == 'all':
-    df = [df_sld, df_fastpi, df_ppim, df_pimgam]
-else:
-    print('error: incorrect background type')
-    sys.exit()
+df, class_labels = get_dfs(data_types, data_dir, data_tag="")
 df = pd.concat(df)
 
 ### DROP higher beam energies
 # df = df[df.beam_E < 5.0]
 
+print("")
 sld_add_features(df)
 
 to_drop_nonp4x4 = ['run','rftime',
@@ -122,40 +102,6 @@ X_test_scale = scaler.transform(X_test)
 
 ### dnn classifier
 print('initializing nn classifier...\n')
-
-def binary_model(n_inputs, n_hidden, hidden_nodes, input_dropout=0.0, biases=True):
-    model = Sequential()
-    if input_dropout > 0.0:
-        model.add(Dropout(input_dropout, input_shape=(n_inputs, )))
-        model.add(Dense(hidden_nodes[0], activation='relu', use_bias=biases))
-    else:
-        model.add(Dense(hidden_nodes[0], input_dim=n_inputs,
-                        activation='relu', use_bias=biases))
-
-    for i in range(n_hidden - 1):
-        model.add(Dense(hidden_nodes[i+1], activation='relu', use_bias=biases))
-
-    model.add(Dense(1, activation='sigmoid'))
-    # Compile model
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    return model
-
-def dec_score_comp(mod, x_train, x_test):
-    # generate decision score histograms to calculate overtraining parameter...
-    decis_train = keras_model.predict(x_train).ravel()
-    decis_test = keras_model.predict(x_test).ravel()
-    # make histograms with 100 bins, get bin contents
-    counts_train, bin_edges_train = np.histogram(decis_train, 100, range=(0,1))
-    counts_test, bin_edges_test = np.histogram(decis_test, 100, range=(0,1))
-    # rescale the train scores to the test scores by integral...
-    counts_train = np.sum(counts_test)/np.sum(counts_train) * counts_train
-
-    diff_sum = 0
-    for i in range(len(counts_train)):
-        diff_sum += (counts_train[i] - counts_test[i])**2
-    diff_sum = diff_sum**0.5 / np.sum(counts_train)
-    return diff_sum
-
 
 keras_model = binary_model(len(X_train.columns), n_hidden=n_hidden_layers,
                            hidden_nodes=hidden_layer_nodes,
@@ -277,7 +223,8 @@ plt.show()
 
 # save the model and weights
 if write_model_files:
-    file_str = './models/' + 'bkgd:' + bkgd_type + '_kf:' + kf_type + '_'
+    data_str = ':'.join(data_types)
+    file_str = './binary_models/' + 'types:' + data_str + '_kf:' + kf_type + '_'
     file_str += 'neps:' + str(n_epochs) + '_layers:'
     for i in range(len(hidden_layer_nodes)):
         file_str += str(hidden_layer_nodes[i])

@@ -18,6 +18,43 @@ from matplotlib import rc
 rc('font',**{'family':'serif','serif':['Palatino']})
 rc('text', usetex=True)
 
+# # # # # # # # # # # #
+
+def get_dfs(data_types, data_dir, data_tag=""):
+    dfs = []
+    class_labels = []
+    for i, t in enumerate(data_types):
+        print('appending ' + t + ' dataframe...')
+        if t == 'sld_mu':
+            dfs.append(pd.read_csv(data_dir + '/flat_slmu' + data_tag + '.csv'))
+            dfs[i]['sig_label'] = 1
+            dfs[i]['type_label'] = 1
+            class_labels.append('sl\_mu')
+        elif t == 'ppim':
+            dfs.append(pd.read_csv(data_dir + '/flat_ppim' + data_tag + '.csv'))
+            dfs[i]['sig_label'] = 0
+            dfs[i]['type_label'] = 2
+            class_labels.append('p\_pim')
+        elif t == 'fastpi':
+            dfs.append(pd.read_csv(data_dir + '/flat_fastpi' + data_tag + '.csv'))
+            dfs[i]['sig_label'] = 0
+            dfs[i]['type_label'] = 3
+            class_labels.append('fastpi')
+        elif t == 'pim_gam':
+            dfs.append(pd.read_csv(data_dir + '/flat_pimgam' + data_tag + '.csv'))
+            dfs[i]['sig_label'] = 0
+            dfs[i]['type_label'] = 4
+            class_labels.append('pim\_gam')
+        elif t == 'sld_e':
+            dfs.append(pd.read_csv(data_dir + '/flat_sle' + data_tag + '.csv'))
+            dfs[i]['sig_label'] = 0
+            dfs[i]['type_label'] = 5
+            class_labels.append('sl\_e')
+
+    return dfs, class_labels
+
+# # # # # # # # # # # #
+
 def plot_confusion_matrix(y_true, y_pred, classes, ax,
                           normalize=False,
                           title=None,
@@ -74,8 +111,8 @@ def plot_confusion_matrix(y_true, y_pred, classes, ax,
 
 def dec_score_comp(mod, x_train, x_test):
     # generate decision score histograms to calculate overtraining parameter...
-    decis_train = keras_model.predict(x_train).ravel()
-    decis_test = keras_model.predict(x_test).ravel()
+    decis_train = mod.predict(x_train).ravel()
+    decis_test = mod.predict(x_test).ravel()
     # make histograms with 100 bins, get bin contents
     counts_train, bin_edges_train = np.histogram(decis_train, 100, range=(0,1))
     counts_test, bin_edges_test = np.histogram(decis_test, 100, range=(0,1))
@@ -87,3 +124,41 @@ def dec_score_comp(mod, x_train, x_test):
         diff_sum += (counts_train[i] - counts_test[i])**2
     diff_sum = diff_sum**0.5 / np.sum(counts_train)
     return diff_sum
+
+# # # # # # # # # # # #
+
+def multiclass_model(n_inputs, n_classes, n_hidden, hidden_nodes, input_dropout=0.0, biases=True):
+    model = Sequential()
+    if input_dropout > 0.0:
+        model.add(Dropout(input_dropout, input_shape=(n_inputs, )))
+        model.add(Dense(hidden_nodes[0], activation='relu', use_bias=biases))
+    else:
+        model.add(Dense(hidden_nodes[0], input_dim=n_inputs,
+                        activation='relu', use_bias=biases))
+
+    for i in range(n_hidden - 1):
+        model.add(Dense(hidden_nodes[i+1], activation='relu', use_bias=biases))
+
+    model.add(Dense(n_classes, activation='softmax'))
+    # Compile model
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
+
+# # # # # # # # # # # #
+
+def binary_model(n_inputs, n_hidden, hidden_nodes, input_dropout=0.0, biases=True):
+    model = Sequential()
+    if input_dropout > 0.0:
+        model.add(Dropout(input_dropout, input_shape=(n_inputs, )))
+        model.add(Dense(hidden_nodes[0], activation='relu', use_bias=biases))
+    else:
+        model.add(Dense(hidden_nodes[0], input_dim=n_inputs,
+                        activation='relu', use_bias=biases))
+
+    for i in range(n_hidden - 1):
+        model.add(Dense(hidden_nodes[i+1], activation='relu', use_bias=biases))
+
+    model.add(Dense(1, activation='sigmoid'))
+    # Compile model
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
