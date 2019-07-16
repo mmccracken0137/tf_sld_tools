@@ -2,7 +2,8 @@
   "DATA": {
     "DATA_TAG": "_small",
     "BKGD_TYPE": "all",
-    "DATA_TYPES": ["sld_mu", "ppim", "fastpi", "pim_gam", "sld_e"],
+    "DATA_TYPES": ["sld_mu", "ppim"],
+    "UNUSED_TYPES": ["fastpi", "pim_gam", "sld_e"],
     "KF_TYPE": "p4vect",
     "DROP_NON_P4X4": 1,
     "DATA_DIR": "../jun2019/features_files/"

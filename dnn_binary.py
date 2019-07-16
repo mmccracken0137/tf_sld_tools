@@ -142,6 +142,7 @@ auc_keras = metrics.auc(fpr_keras, tpr_keras)
 print("auc score on test: %0.4f" % auc_keras)
 
 fig = plt.figure(figsize=(11,7))
+
 plt.subplot(3,2,1)
 plt.plot(epochs, eval_accs, label='train, dropout=' + str(dropout_frac))
 plt.plot(epochs, train_accs, label='train')
