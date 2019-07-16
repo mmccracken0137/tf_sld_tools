@@ -51,17 +51,20 @@ df_sld = pd.read_csv(data_dir + "/flat_slmu" + data_tag + ".csv")#, dtype='float
 df_ppim = pd.read_csv(data_dir + "/flat_ppim" + data_tag + ".csv")
 df_fastpi = pd.read_csv(data_dir + "/flat_fastpi" + data_tag + ".csv")
 df_pimgam = pd.read_csv(data_dir + "/flat_pimgam" + data_tag + ".csv")
+df_sldel = pd.read_csv(data_dir + "/flat_sle" + data_tag + ".csv")#, dtype='float64')
 
 # add types/labels
 df_sld['sig_label'] = 1
 df_ppim['sig_label'] = 0
 df_fastpi['sig_label'] = 0
 df_pimgam['sig_label'] = 0
+df_sldel['sig_label'] = 0
 
 df_sld['type_label'] = 1
 df_ppim['type_label'] = 2
 df_fastpi['type_label'] = 3
 df_pimgam['type_label'] = 4
+df_sldel['type_label'] = 5
 
 class_labels = []
 if bkgd_type == 'ppim':
@@ -71,8 +74,8 @@ elif bkgd_type == 'fastpi':
     df = [df_sld, df_fastpi]
     class_labels = ['sld\_mu', 'fastpi']
 elif bkgd_type == 'all':
-    df = [df_sld, df_ppim, df_fastpi, df_pimgam]
-    class_labels = ['sld\_mu', 'p\_pim', 'fastpi', 'pim\_gam']
+    df = [df_sld, df_ppim, df_fastpi, df_pimgam, df_sldel]
+    class_labels = ['sld\_mu', 'p\_pim', 'fastpi', 'pim\_gam', 'sld\_e']
 else:
     print('error: incorrect background type')
     sys.exit()
