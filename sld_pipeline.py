@@ -25,6 +25,20 @@ def sld_add_features(df):
     print('calculating new features...\n')
     calc_drops = []
 
+    df['kin_chisq_ndf'] = df['kin_chisq'] / df['kin_ndf']
+
+    df['kp_chisq_ndf_trk'] = df['kp_chisq_trk'] / df['kp_ndf_trk']
+    df['kp_chisq_ndf_time'] = df['kp_chisq_time'] / df['kp_ndf_time']
+    df['kp_chisq_ndf_dedx'] = df['kp_chisq_dedx'] / df['kp_ndf_dedx']
+
+    df['p_chisq_ndf_trk'] = df['p_chisq_trk'] / df['p_ndf_trk']
+    df['p_chisq_ndf_time'] = df['p_chisq_time'] / df['p_ndf_time']
+    df['p_chisq_ndf_dedx'] = df['p_chisq_dedx'] / df['p_ndf_dedx']
+
+    df['mum_chisq_ndf_trk'] = df['mum_chisq_trk'] / df['mum_ndf_trk']
+    df['mum_chisq_ndf_time'] = df['mum_chisq_time'] / df['mum_ndf_time']
+    df['mum_chisq_ndf_dedx'] = df['mum_chisq_dedx'] / df['mum_ndf_dedx']
+
     # cylindrical coords for vector quantites
     df['kp_p4kin_perp'] = np.sqrt(df['kp_p4kin_py']**2 + df['kp_p4kin_pz']**2)
     df['kp_p4kin_phi'] = np.arctan2(df['kp_p4kin_py'], df['kp_p4kin_px'])

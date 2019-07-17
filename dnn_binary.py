@@ -163,13 +163,12 @@ plt.legend(loc="upper right")
 plt.ylabel('loss')
 plt.xlabel('epoch')
 
+# decsion scores
+plt.subplot(3,2,3)
 sig_decis_train = keras_model.predict(X_train_scale[y_train>0.5]).ravel()
 bkgd_decis_train = keras_model.predict(X_train_scale[y_train<=0.5]).ravel()
 sig_decis = keras_model.predict(X_test_scale[y_test>0.5]).ravel()
 bkgd_decis = keras_model.predict(X_test_scale[y_test<=0.5]).ravel()
-
-# decsion scores
-plt.subplot(3,2,3)
 #sig_decis_train *= np.amax(sig_decis) / np.amax(sig_decis_train)
 sig_counts_train, sig_bin_edges_train = np.histogram(sig_decis_train, 100, range=(0,1))
 sig_counts, sig_bin_edges = np.histogram(sig_decis, 100, range=(0,1))
