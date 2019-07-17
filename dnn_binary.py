@@ -48,7 +48,7 @@ data_types = config['DATA']['DATA_TYPES']
 
 # read in feats files
 print('\nreading data files...\n')
-df, class_labels = get_dfs(data_types, data_dir, data_tag="")
+df, class_labels = get_dfs(data_types, data_dir, data_tag)
 df = pd.concat(df)
 
 ### DROP higher beam energies
