@@ -37,7 +37,7 @@ def sld_add_features(df):
 
     df['mum_chisq_ndf_trk'] = df['mum_chisq_trk'] / df['mum_ndf_trk']
     df['mum_chisq_ndf_time'] = df['mum_chisq_time'] / df['mum_ndf_time']
-    df['mum_chisq_ndf_dedx'] = df['mum_chisq_dedx'] / df['mum_ndf_dedx']
+    #df['mum_chisq_ndf_dedx'] = df['mum_chisq_dedx'] / df['mum_ndf_dedx']
 
     # cylindrical coords for vector quantites
     df['kp_p4kin_perp'] = np.sqrt(df['kp_p4kin_py']**2 + df['kp_p4kin_pz']**2)
